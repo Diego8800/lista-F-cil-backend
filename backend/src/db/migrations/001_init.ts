@@ -6,6 +6,11 @@
 export const migration001 = {
   name: "001_init",
   statements: [
+    // Garante que a tabela "user" do Neon Auth exista antes das chaves estrangeiras
+    `CREATE TABLE IF NOT EXISTS "user" (
+      id uuid PRIMARY KEY DEFAULT gen_random_uuid()
+    )`,
+
     `CREATE TABLE IF NOT EXISTS categories (
       id          uuid PRIMARY KEY DEFAULT gen_random_uuid(),
       user_id     uuid NOT NULL REFERENCES "user"(id) ON DELETE CASCADE,
