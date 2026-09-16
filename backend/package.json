@@ -6,7 +6,7 @@
   "description": "API REST do aplicativo Lista Fácil (Neon PostgreSQL + Neon Auth)",
   "scripts": {
     "dev": "tsx watch src/index.ts",
-   "build": "echo 'Skipping tsc build'",
+    "build": "echo 'Skipping tsc build'",
     "start": "tsx src/index.ts",
     "migrate": "tsx src/db/migrate.ts",
     "seed": "tsx src/db/seed.ts",
@@ -19,8 +19,8 @@
     "fastify": "^5.2.0",
     "jose": "^5.9.6",
     "zod": "^3.24.1",
-    "@fastify/rate-limit": "^11.1.0"
-     "tsx": "^4.19.2",
+    "@fastify/rate-limit": "^11.1.0",
+    "tsx": "^4.19.2"
   },
   "devDependencies": {
     "@types/node": "^22.10.0",
