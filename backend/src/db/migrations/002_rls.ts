@@ -3,6 +3,15 @@
  * Requer o Neon Auth habilitado (função auth.user_id() disponível no banco).
  * Cada usuário enxerga e manipula exclusivamente os próprios dados.
  */
+
+// Garante a existência do schema auth e da função auth.user_id()
+const setupAuthSchema = [
+  `CREATE SCHEMA IF NOT EXISTS auth`,
+  `CREATE OR REPLACE FUNCTION auth.user_id() RETURNS uuid AS $$
+     SELECT NULLIF(current_setting('request.jwt.claim.sub', true), '')::uuid;
+   $$ LANGUAGE sql STABLE`,
+];
+
 const owned = (table: string) => [
   `ALTER TABLE ${table} ENABLE ROW LEVEL SECURITY`,
   `DROP POLICY IF EXISTS ${table}_owner_select ON ${table}`,
@@ -35,6 +44,7 @@ const viaLists = (table: string) => [
 export const migration002 = {
   name: "002_rls",
   statements: [
+    ...setupAuthSchema,
     ...owned("lists"),
     ...owned("products"),
     ...owned("categories"),
