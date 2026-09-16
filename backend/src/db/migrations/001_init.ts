@@ -10,25 +10,25 @@ export const migration001 = {
       id          uuid PRIMARY KEY DEFAULT gen_random_uuid(),
       user_id     uuid NOT NULL REFERENCES "user"(id) ON DELETE CASCADE,
       name        text NOT NULL,
-      created_at  timestamptz NOT NULL DEFAULT now(),
-      CONSTRAINT categories_user_name_unique UNIQUE (user_id, lower(name))
+      created_at  timestamptz NOT NULL DEFAULT now()
     )`,
+    `CREATE UNIQUE INDEX IF NOT EXISTS categories_user_name_unique ON categories (user_id, lower(name))`,
 
     `CREATE TABLE IF NOT EXISTS products (
       id          uuid PRIMARY KEY DEFAULT gen_random_uuid(),
       user_id     uuid NOT NULL REFERENCES "user"(id) ON DELETE CASCADE,
       name        text NOT NULL,
-      created_at  timestamptz NOT NULL DEFAULT now(),
-      CONSTRAINT products_user_name_unique UNIQUE (user_id, lower(name))
+      created_at  timestamptz NOT NULL DEFAULT now()
     )`,
+    `CREATE UNIQUE INDEX IF NOT EXISTS products_user_name_unique ON products (user_id, lower(name))`,
 
     `CREATE TABLE IF NOT EXISTS establishments (
       id          uuid PRIMARY KEY DEFAULT gen_random_uuid(),
       user_id     uuid NOT NULL REFERENCES "user"(id) ON DELETE CASCADE,
       name        text NOT NULL,
-      created_at  timestamptz NOT NULL DEFAULT now(),
-      CONSTRAINT establishments_user_name_unique UNIQUE (user_id, lower(name))
+      created_at  timestamptz NOT NULL DEFAULT now()
     )`,
+    `CREATE UNIQUE INDEX IF NOT EXISTS establishments_user_name_unique ON establishments (user_id, lower(name))`,
 
     `CREATE TABLE IF NOT EXISTS lists (
       id          uuid PRIMARY KEY DEFAULT gen_random_uuid(),
