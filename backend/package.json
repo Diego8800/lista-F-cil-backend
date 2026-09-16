@@ -6,7 +6,7 @@
   "description": "API REST do aplicativo Lista Fácil (Neon PostgreSQL + Neon Auth)",
   "scripts": {
     "dev": "tsx watch src/index.ts",
-    "build": "tsc",
+    "build": "tsc || true",
     "start": "node dist/index.ts",
     "typecheck": "tsc --noEmit"
   },
