@@ -110,6 +110,12 @@ data class EstablishmentsResponse(val establishments: List<EstablishmentDto> = e
 @Serializable
 data class NameRequest(val name: String)
 
+@Serializable
+data class ProductSuggestionDto(val id: String = "", val name: String = "")
+
+@Serializable
+data class ProductsResponse(val products: List<ProductSuggestionDto> = emptyList())
+
 // ---------- Histórico de preços ----------
 
 @Serializable
