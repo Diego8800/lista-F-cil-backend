@@ -40,7 +40,7 @@ await app.register(async (api) => {
   await api.register(catalogRoutes);
   await api.register(productRoutes);
   await api.register(reportRoutes);
-});
+}, { prefix: "/api" });
 
 app.setErrorHandler((err, req, reply) => {
   req.log.error(err);
