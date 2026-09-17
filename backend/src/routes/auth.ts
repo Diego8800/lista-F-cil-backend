@@ -1,5 +1,7 @@
 import type { FastifyInstance } from "fastify";
 
+const NEON_ORIGIN = process.env.NEON_AUTH_ORIGIN || "https://lista-f-cil-backend-production.up.railway.app";
+
 export async function authRoutes(app: FastifyInstance) {
   const rawBase = (process.env.NEON_AUTH_BASE_URL || "").replace(/\/$/, "");
   const baseUrl = rawBase.endsWith("/auth") ? rawBase.slice(0, -5) : rawBase;
@@ -7,7 +9,7 @@ export async function authRoutes(app: FastifyInstance) {
   app.post("/auth/sign-up/email", async (req, reply) => {
     const res = await fetch(`${baseUrl}/auth/sign-up/email`, {
       method: "POST",
-      headers: { "Content-Type": "application/json" },
+      headers: { "Content-Type": "application/json", "Origin": NEON_ORIGIN },
       body: JSON.stringify(req.body),
     });
     const data = await res.json();
@@ -17,7 +19,7 @@ export async function authRoutes(app: FastifyInstance) {
   app.post("/auth/sign-in/email", async (req, reply) => {
     const res = await fetch(`${baseUrl}/auth/sign-in/email`, {
       method: "POST",
-      headers: { "Content-Type": "application/json" },
+      headers: { "Content-Type": "application/json", "Origin": NEON_ORIGIN },
       body: JSON.stringify(req.body),
     });
     const data = await res.json();
@@ -30,6 +32,7 @@ export async function authRoutes(app: FastifyInstance) {
       method: "POST",
       headers: {
         "Authorization": `Bearer ${token}`,
+        "Origin": NEON_ORIGIN,
         "Cookie": `__Secure-neon-auth.session_token=${token}; neon-auth.session_token=${token}`,
       },
     });
@@ -40,7 +43,7 @@ export async function authRoutes(app: FastifyInstance) {
   app.post("/auth/request-password-reset", async (req, reply) => {
     const res = await fetch(`${baseUrl}/auth/request-password-reset`, {
       method: "POST",
-      headers: { "Content-Type": "application/json" },
+      headers: { "Content-Type": "application/json", "Origin": NEON_ORIGIN },
       body: JSON.stringify(req.body),
     });
     const data = await res.json();
@@ -54,6 +57,7 @@ export async function authRoutes(app: FastifyInstance) {
       headers: {
         "Content-Type": "application/json",
         "Authorization": `Bearer ${token}`,
+        "Origin": NEON_ORIGIN,
       },
       body: JSON.stringify(req.body),
     });
@@ -68,6 +72,7 @@ export async function authRoutes(app: FastifyInstance) {
       headers: {
         "Content-Type": "application/json",
         "Authorization": `Bearer ${token}`,
+        "Origin": NEON_ORIGIN,
       },
       body: JSON.stringify(req.body),
     });
