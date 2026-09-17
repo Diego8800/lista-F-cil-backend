@@ -28,10 +28,12 @@ export function registerAuth(app: FastifyInstance): void {
     try {
       const targetUrl = `${baseUrl}/auth/get-session`;
 
+      // Envia o token via Bearer e simula os cookies do Better Auth para cobrir ambos os casos
       const response = await fetch(targetUrl, {
         method: "GET",
         headers: {
-          "Authorization": `Bearer ${token}`
+          "Authorization": `Bearer ${token}`,
+          "Cookie": `__Secure-neon-auth.session_token=${token}; neon-auth.session_token=${token}`
         }
       });
 
@@ -41,12 +43,16 @@ export function registerAuth(app: FastifyInstance): void {
 
       const rawText = await response.text();
       
-      // Se a resposta for "null" ou vazia, a sessão expirou no Neon Auth
       if (!rawText || rawText.trim() === "null") {
         return reply.code(401).send({ error: "Sessão expirada. Faça login novamente." });
       }
 
-      const data = JSON.parse(rawText);
+      let data: any = {};
+      try {
+        data = JSON.parse(rawText);
+      } catch (e) {
+        return reply.code(401).send({ error: "Resposta de sessão inválida" });
+      }
 
       const userId =
         data?.user?.id ||
@@ -56,12 +62,12 @@ export function registerAuth(app: FastifyInstance): void {
         data?.id;
 
       if (!userId) {
-        return reply.code(401).send({ error: "Sessão expirada. Faça login novamente." });
+        return reply.code(401).send({ error: "Usuário não encontrado na sessão" });
       }
 
       req.auth = { userId, token };
     } catch (err) {
-      console.error("[Auth Exception]:", err);
+      console.error("[Auth Error]:", err);
       return reply.code(401).send({ error: "Falha ao validar autenticação" });
     }
   });
