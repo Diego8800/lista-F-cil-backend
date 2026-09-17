@@ -2,7 +2,6 @@ import type { FastifyInstance, FastifyReply, FastifyRequest } from "fastify";
 
 declare module "fastify" {
   interface FastifyRequest {
-    /** Dados da sessão validada (preHandler `authenticate`). */
     auth: { userId: string; token: string };
   }
   interface FastifyInstance {
@@ -10,12 +9,10 @@ declare module "fastify" {
   }
 }
 
-/**
- * Valida a sessão diretamente na API do Neon Auth.
- */
 export function registerAuth(app: FastifyInstance): void {
   const rawBase = (process.env.NEON_AUTH_BASE_URL || "").replace(/\/$/, "");
   const baseUrl = rawBase.endsWith("/auth") ? rawBase.slice(0, -5) : rawBase;
+  const origin = process.env.NEON_AUTH_ORIGIN || "https://lista-f-cil-backend-production.up.railway.app";
 
   app.decorate("authenticate", async (req: FastifyRequest, reply: FastifyReply) => {
     const header = req.headers.authorization;
@@ -28,22 +25,22 @@ export function registerAuth(app: FastifyInstance): void {
     try {
       const targetUrl = `${baseUrl}/auth/get-session`;
 
-      // Envia o token via Bearer e simula os cookies do Better Auth para cobrir ambos os casos
       const response = await fetch(targetUrl, {
-  method: "GET",
-  headers: {
-    "Authorization": `Bearer ${token}`,
-    "Cookie": `__Secure-neon-auth.session_token=${token}; neon-auth.session_token=${token}`,
-    "Origin": process.env.NEON_AUTH_ORIGIN || "https://lista-f-cil-backend-production.up.railway.app"
-  }
-});
+        method: "GET",
+        headers: {
+          "Authorization": `Bearer ${token}`,
+          "Cookie": `__Secure-neon-auth.session_token=${token}; neon-auth.session_token=${token}`,
+          "Origin": origin
+        }
+      });
+
+      const rawText = await response.text();
+      console.log("[Auth Debug] status:", response.status, "body:", rawText);
 
       if (!response.ok) {
         return reply.code(401).send({ error: "Sessão inválida ou expirada" });
       }
 
-      const rawText = await response.text();
-      
       if (!rawText || rawText.trim() === "null") {
         return reply.code(401).send({ error: "Sessão expirada. Faça login novamente." });
       }
