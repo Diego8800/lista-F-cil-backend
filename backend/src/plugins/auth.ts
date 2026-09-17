@@ -25,11 +25,11 @@ export function registerAuth(app: FastifyInstance): void {
     const token = header.slice("Bearer ".length).trim();
 
     try {
+      // Faz o fetch para o Neon Auth repassando apenas o Bearer token (sem Origin falso)
       const response = await fetch(`${neonAuthUrl}/get-session`, {
         headers: {
           "Authorization": `Bearer ${token}`,
-          "Origin": "http://localhost:3000"
-        }
+        },
       });
 
       if (!response.ok) {
@@ -38,13 +38,12 @@ export function registerAuth(app: FastifyInstance): void {
 
       const data = await response.json();
       
-      // Log do payload para depuração no Railway
-      console.log("[Neon Auth Response]:", JSON.stringify(data));
+      console.log("[Neon Auth Response Data]:", JSON.stringify(data));
 
-      // Mapeia todas as possíveis estruturas de ID retornadas pelo Neon Auth / Better Auth
-      const userId = 
-        data?.user?.id || 
-        data?.session?.userId || 
+      // Extrai o ID independente da estrutura do payload do Neon Auth
+      const userId =
+        data?.user?.id ||
+        data?.session?.userId ||
         data?.session?.user?.id ||
         data?.userId ||
         data?.id;
