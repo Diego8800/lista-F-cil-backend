@@ -1,4 +1,5 @@
 import type { FastifyInstance, FastifyReply, FastifyRequest } from "fastify";
+import { db } from "../db/client.js";
 
 declare module "fastify" {
   interface FastifyRequest {
@@ -34,13 +35,8 @@ export function registerAuth(app: FastifyInstance): void {
       });
 
       const rawText = await response.text();
-      console.log("[Auth Debug] status:", response.status, "body:", rawText);
 
-      if (!response.ok) {
-        return reply.code(401).send({ error: "Sessão inválida ou expirada" });
-      }
-
-      if (!rawText || rawText.trim() === "null") {
+      if (!response.ok || !rawText || rawText.trim() === "null") {
         return reply.code(401).send({ error: "Sessão expirada. Faça login novamente." });
       }
 
@@ -61,6 +57,10 @@ export function registerAuth(app: FastifyInstance): void {
       if (!userId) {
         return reply.code(401).send({ error: "Usuário não encontrado na sessão" });
       }
+
+      // Garante que o usuário existe na tabela local
+      const sql = db(token);
+      await sql`INSERT INTO "user" (id) VALUES (${userId}) ON CONFLICT (id) DO NOTHING`;
 
       req.auth = { userId, token };
     } catch (err) {
