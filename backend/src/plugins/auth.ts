@@ -2,7 +2,6 @@ import type { FastifyInstance, FastifyReply, FastifyRequest } from "fastify";
 
 declare module "fastify" {
   interface FastifyRequest {
-    /** Dados da sessão validada (preHandler `authenticate`). */
     auth: { userId: string; token: string };
   }
   interface FastifyInstance {
@@ -10,13 +9,8 @@ declare module "fastify" {
   }
 }
 
-/**
- * Valida a sessão diretamente na API do Neon Auth.
- */
 export function registerAuth(app: FastifyInstance): void {
-  // Limpa barras e sufixo /auth duplicado no final da URL base
-  const rawBase = (process.env.NEON_AUTH_BASE_URL || "").replace(/\/$/, "");
-  const baseUrl = rawBase.endsWith("/auth") ? rawBase.slice(0, -5) : rawBase;
+  const neonAuthUrl = (process.env.NEON_AUTH_BASE_URL || "").replace(/\/$/, "");
 
   app.decorate("authenticate", async (req: FastifyRequest, reply: FastifyReply) => {
     const header = req.headers.authorization;
@@ -24,32 +18,46 @@ export function registerAuth(app: FastifyInstance): void {
       return reply.code(401).send({ error: "Token de autenticação ausente" });
     }
 
-    const fullToken = header.slice("Bearer ".length).trim();
-    
-    // Extrai o token de sessão base (parte antes do primeiro ponto, se houver)
-    const rawSessionToken = fullToken.split(".")[0];
+    const token = header.slice("Bearer ".length).trim();
+
+    // 1. Log das variáveis de ambiente e token recebido do app Android
+    console.log("=== [DEBUG AUTH START] ===");
+    console.log("NEON_AUTH_BASE_URL configurado:", neonAuthUrl);
+    console.log("Token recebido do Android:", token);
 
     try {
-      const targetUrl = `${baseUrl}/auth/get-session`;
+      // Testamos a rota de sessão padrão do Better Auth / Neon Auth
+      const targetUrl = neonAuthUrl.endsWith("/auth")
+        ? `${neonAuthUrl}/get-session`
+        : `${neonAuthUrl}/auth/get-session`;
 
-      // Tenta validar no Neon Auth passando os formatos aceitos de cookie/bearer
+      console.log("URL chamada no Neon Auth:", targetUrl);
+
       const response = await fetch(targetUrl, {
         method: "GET",
         headers: {
-          "Authorization": `Bearer ${rawSessionToken}`,
-          "Cookie": `__Secure-neon-auth.session_token=${fullToken}; neon-auth.session_token=${rawSessionToken}`
-        },
+          "Authorization": `Bearer ${token}`
+        }
       });
 
+      console.log("Status HTTP do Neon Auth:", response.status);
+
+      const rawText = await response.text();
+      console.log("Resposta BRUTA (raw text) do Neon Auth:", rawText);
+
       if (!response.ok) {
-        console.error(`[Auth Failed] Status: ${response.status} URL: ${targetUrl}`);
+        console.log("=== [DEBUG AUTH END - FAIL STATUS] ===");
         return reply.code(401).send({ error: "Sessão inválida ou expirada" });
       }
 
-      const data = await response.json();
-      console.log("[Neon Auth Decoded Payload]:", JSON.stringify(data));
+      let data: any = {};
+      try {
+        data = JSON.parse(rawText);
+      } catch (e) {
+        console.error("Falha ao parsear JSON do Neon Auth");
+      }
 
-      // Extrai o ID do usuário retornado pelo Neon Auth
+      // Procura por qualquer campo que se pareça com o ID do usuário
       const userId =
         data?.user?.id ||
         data?.session?.userId ||
@@ -57,14 +65,17 @@ export function registerAuth(app: FastifyInstance): void {
         data?.userId ||
         data?.id;
 
+      console.log("UserId extraído:", userId);
+      console.log("=== [DEBUG AUTH END] ===");
+
       if (!userId) {
-        console.error("[Auth Failure] Payload sem userId válido:", data);
         return reply.code(401).send({ error: "Usuário não encontrado na sessão" });
       }
 
-      req.auth = { userId, token: fullToken };
+      req.auth = { userId, token };
     } catch (err) {
-      console.error("[Auth Error]:", err);
+      console.error("[DEBUG AUTH ERROR]:", err);
+      console.log("=== [DEBUG AUTH END - EXCEPTION] ===");
       return reply.code(401).send({ error: "Sessão inválida ou expirada" });
     }
   });
