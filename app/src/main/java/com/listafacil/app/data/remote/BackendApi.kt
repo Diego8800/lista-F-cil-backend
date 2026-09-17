@@ -67,6 +67,9 @@ interface BackendApi {
     @GET("products/{id}/history")
     suspend fun getProductHistory(@Path("id") productId: String): ProductHistoryDto
 
+    @GET("products")
+suspend fun searchProducts(@Query("q") q: String = ""): ProductsResponse
+
     // ---------- Catálogos ----------
     @GET("categories")
     suspend fun getCategories(): CategoriesResponse
