@@ -24,17 +24,20 @@ export function registerAuth(app: FastifyInstance): void {
       return reply.code(401).send({ error: "Token de autenticação ausente" });
     }
 
-    const token = header.slice("Bearer ".length).trim();
+    const fullToken = header.slice("Bearer ".length).trim();
+    
+    // Extrai o token de sessão base (parte antes do primeiro ponto, se houver)
+    const rawSessionToken = fullToken.split(".")[0];
 
     try {
-      // Monta a URL correta garantindo apenas um /auth/get-session
       const targetUrl = `${baseUrl}/auth/get-session`;
 
+      // Tenta validar no Neon Auth passando os formatos aceitos de cookie/bearer
       const response = await fetch(targetUrl, {
         method: "GET",
         headers: {
-          "Authorization": `Bearer ${token}`,
-          "Cookie": `__Secure-neon-auth.session_token=${token}; neon-auth.session_token=${token}`
+          "Authorization": `Bearer ${rawSessionToken}`,
+          "Cookie": `__Secure-neon-auth.session_token=${fullToken}; neon-auth.session_token=${rawSessionToken}`
         },
       });
 
@@ -44,7 +47,9 @@ export function registerAuth(app: FastifyInstance): void {
       }
 
       const data = await response.json();
+      console.log("[Neon Auth Decoded Payload]:", JSON.stringify(data));
 
+      // Extrai o ID do usuário retornado pelo Neon Auth
       const userId =
         data?.user?.id ||
         data?.session?.userId ||
@@ -57,7 +62,7 @@ export function registerAuth(app: FastifyInstance): void {
         return reply.code(401).send({ error: "Usuário não encontrado na sessão" });
       }
 
-      req.auth = { userId, token };
+      req.auth = { userId, token: fullToken };
     } catch (err) {
       console.error("[Auth Error]:", err);
       return reply.code(401).send({ error: "Sessão inválida ou expirada" });
