@@ -14,7 +14,8 @@ declare module "fastify" {
  * Valida a sessão diretamente na API do Neon Auth.
  */
 export function registerAuth(app: FastifyInstance): void {
-  const neonAuthUrl = process.env.NEON_AUTH_BASE_URL || "";
+  // Garante que a URL base termine sem barra final
+  const neonAuthUrl = (process.env.NEON_AUTH_BASE_URL || "").replace(/\/$/, "");
 
   app.decorate("authenticate", async (req: FastifyRequest, reply: FastifyReply) => {
     const header = req.headers.authorization;
@@ -25,10 +26,16 @@ export function registerAuth(app: FastifyInstance): void {
     const token = header.slice("Bearer ".length).trim();
 
     try {
-      // Faz o fetch para o Neon Auth repassando apenas o Bearer token (sem Origin falso)
-      const response = await fetch(`${neonAuthUrl}/get-session`, {
+      // O endpoint correto do Neon/Better Auth é /auth/get-session ou /get-session
+      const targetUrl = neonAuthUrl.endsWith("/auth")
+        ? `${neonAuthUrl}/get-session`
+        : `${neonAuthUrl}/auth/get-session`;
+
+      const response = await fetch(targetUrl, {
+        method: "GET",
         headers: {
           "Authorization": `Bearer ${token}`,
+          "Cookie": `__Secure-neon-auth.session_token=${token}; neon-auth.session_token=${token}`
         },
       });
 
@@ -38,9 +45,9 @@ export function registerAuth(app: FastifyInstance): void {
 
       const data = await response.json();
       
-      console.log("[Neon Auth Response Data]:", JSON.stringify(data));
+      console.log("[Neon Auth Validated Payload]:", JSON.stringify(data));
 
-      // Extrai o ID independente da estrutura do payload do Neon Auth
+      // Extrai o ID do usuário da resposta do Neon Auth
       const userId =
         data?.user?.id ||
         data?.session?.userId ||
@@ -49,6 +56,7 @@ export function registerAuth(app: FastifyInstance): void {
         data?.id;
 
       if (!userId) {
+        console.error("[Auth Failure] Payload sem userId válido:", data);
         return reply.code(401).send({ error: "Usuário não encontrado na sessão" });
       }
 
