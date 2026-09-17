@@ -1,4 +1,5 @@
 import type { FastifyInstance, FastifyReply, FastifyRequest } from "fastify";
+import * as jose from "jose";
 
 declare module "fastify" {
   interface FastifyRequest {
@@ -10,9 +11,8 @@ declare module "fastify" {
 }
 
 export function registerAuth(app: FastifyInstance): void {
-  const rawBase = (process.env.NEON_AUTH_BASE_URL || "").replace(/\/$/, "");
-  const baseUrl = rawBase.endsWith("/auth") ? rawBase.slice(0, -5) : rawBase;
-  const origin = process.env.NEON_AUTH_ORIGIN || "https://lista-f-cil-backend-production.up.railway.app";
+  const jwksUrl = process.env.NEON_AUTH_JWKS_URL || "";
+  const JWKS = jose.createRemoteJWKSet(new URL(jwksUrl));
 
   app.decorate("authenticate", async (req: FastifyRequest, reply: FastifyReply) => {
     const header = req.headers.authorization;
@@ -23,50 +23,17 @@ export function registerAuth(app: FastifyInstance): void {
     const token = header.slice("Bearer ".length).trim();
 
     try {
-      const targetUrl = `${baseUrl}/auth/get-session`;
-
-      const response = await fetch(targetUrl, {
-        method: "GET",
-        headers: {
-          "Authorization": `Bearer ${token}`,
-          "Cookie": `__Secure-neon-auth.session_token=${token}; neon-auth.session_token=${token}`,
-          "Origin": origin
-        }
-      });
-
-      const rawText = await response.text();
-      console.log("[Auth Debug] status:", response.status, "body:", rawText);
-
-      if (!response.ok) {
-        return reply.code(401).send({ error: "Sessão inválida ou expirada" });
-      }
-
-      if (!rawText || rawText.trim() === "null") {
-        return reply.code(401).send({ error: "Sessão expirada. Faça login novamente." });
-      }
-
-      let data: any = {};
-      try {
-        data = JSON.parse(rawText);
-      } catch (e) {
-        return reply.code(401).send({ error: "Resposta de sessão inválida" });
-      }
-
-      const userId =
-        data?.user?.id ||
-        data?.session?.userId ||
-        data?.session?.user?.id ||
-        data?.userId ||
-        data?.id;
+      const { payload } = await jose.jwtVerify(token, JWKS);
+      const userId = (payload.sub || payload["userId"] || payload["id"]) as string;
 
       if (!userId) {
-        return reply.code(401).send({ error: "Usuário não encontrado na sessão" });
+        return reply.code(401).send({ error: "Usuário não encontrado no token" });
       }
 
       req.auth = { userId, token };
     } catch (err) {
       console.error("[Auth Error]:", err);
-      return reply.code(401).send({ error: "Falha ao validar autenticação" });
+      return reply.code(401).send({ error: "Sessão expirada. Faça login novamente." });
     }
   });
 }
