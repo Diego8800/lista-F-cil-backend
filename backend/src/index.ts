@@ -9,6 +9,7 @@ import { itemRoutes } from "./routes/items.js";
 import { catalogRoutes } from "./routes/catalogs.js";
 import { productRoutes } from "./routes/products.js";
 import { reportRoutes } from "./routes/reports.js";
+import { authRoutes } from "./routes/auth.js";
 
 const app = Fastify({ logger: true });
 
@@ -27,6 +28,8 @@ if (env.AUTO_MIGRATE) {
 }
 
 registerAuth(app);
+
+await app.register(authRoutes, { prefix: "/api" });
 
 // Rotas protegidas: toda requisição exige sessão Neon Auth válida.
 await app.register(async (api) => {
