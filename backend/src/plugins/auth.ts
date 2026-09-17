@@ -30,12 +30,13 @@ export function registerAuth(app: FastifyInstance): void {
 
       // Envia o token via Bearer e simula os cookies do Better Auth para cobrir ambos os casos
       const response = await fetch(targetUrl, {
-        method: "GET",
-        headers: {
-          "Authorization": `Bearer ${token}`,
-          "Cookie": `__Secure-neon-auth.session_token=${token}; neon-auth.session_token=${token}`
-        }
-      });
+  method: "GET",
+  headers: {
+    "Authorization": `Bearer ${token}`,
+    "Cookie": `__Secure-neon-auth.session_token=${token}; neon-auth.session_token=${token}`,
+    "Origin": process.env.NEON_AUTH_ORIGIN || "https://lista-f-cil-backend-production.up.railway.app"
+  }
+});
 
       if (!response.ok) {
         return reply.code(401).send({ error: "Sessão inválida ou expirada" });
