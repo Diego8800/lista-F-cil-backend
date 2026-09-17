@@ -59,6 +59,15 @@ class AddEditItemViewModel @Inject constructor(
         }
     }
 
+    fun reloadEstablishments() {
+        viewModelScope.launch {
+            try {
+                val establishments = repository.getEstablishments()
+                _ui.value = _ui.value.copy(establishments = establishments)
+            } catch (e: Exception) { /* silencioso */ }
+        }
+    }
+
     fun addCategory(name: String) {
         if (name.isBlank()) return
         viewModelScope.launch {
