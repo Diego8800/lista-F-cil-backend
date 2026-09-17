@@ -1,5 +1,4 @@
-
-                package com.listafacil.app.ui.screens.list
+package com.listafacil.app.ui.screens.list
 
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
@@ -21,6 +20,7 @@ import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
@@ -31,6 +31,9 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
+import androidx.lifecycle.Lifecycle
+import androidx.lifecycle.LifecycleEventObserver
+import androidx.lifecycle.compose.LocalLifecycleOwner
 import com.listafacil.app.core.Money
 import com.listafacil.app.core.SUPPORTED_UNITS
 
@@ -45,6 +48,7 @@ fun AddEditItemScreen(
 
     var productName by remember { mutableStateOf(editingItem?.productName ?: "") }
     var categoryId by remember { mutableStateOf(editingItem?.categoryId) }
+    var categoryQuery by remember { mutableStateOf("") }
     var quantity by remember { mutableStateOf(editingItem?.quantity?.toString() ?: "1") }
     var unit by remember { mutableStateOf(editingItem?.unit ?: "un") }
     var currentPrice by remember {
@@ -52,28 +56,41 @@ fun AddEditItemScreen(
     }
     var note by remember { mutableStateOf(editingItem?.note ?: "") }
     var establishmentId by remember { mutableStateOf(editingItem?.establishmentId) }
+    var establishmentQuery by remember { mutableStateOf("") }
 
+    var productMenu by remember { mutableStateOf(false) }
     var categoryMenu by remember { mutableStateOf(false) }
     var unitMenu by remember { mutableStateOf(false) }
     var establishmentMenu by remember { mutableStateOf(false) }
     var newCategoryDialog by remember { mutableStateOf(false) }
+    var newEstablishmentDialog by remember { mutableStateOf(false) }
+
+    val lifecycleOwner = LocalLifecycleOwner.current
+    DisposableEffect(lifecycleOwner) {
+        val observer = LifecycleEventObserver { _, event ->
+            if (event == Lifecycle.Event.ON_RESUME) {
+                viewModel.reloadEstablishments()
+            }
+        }
+        lifecycleOwner.lifecycle.addObserver(observer)
+        onDispose { lifecycleOwner.lifecycle.removeObserver(observer) }
+    }
 
     LaunchedEffect(ui.saved) {
         if (ui.saved) onBack()
-    }
-    LaunchedEffect(Unit) {
-        viewModel.reloadEstablishments()
     }
     LaunchedEffect(editingItem) {
         editingItem?.let {
             if (productName.isEmpty()) {
                 productName = it.productName
                 categoryId = it.categoryId
+                categoryQuery = ui.categories.firstOrNull { c -> c.id == it.categoryId }?.name ?: ""
                 quantity = it.quantity.toString()
                 unit = it.unit
                 currentPrice = it.currentPriceCents?.let { c -> Money.format(c).replace("R$", "").trim() } ?: ""
                 note = it.note ?: ""
                 establishmentId = it.establishmentId
+                establishmentQuery = it.establishmentName ?: ""
             }
         }
     }
@@ -89,41 +106,59 @@ fun AddEditItemScreen(
             Text(it, color = MaterialTheme.colorScheme.error, style = MaterialTheme.typography.bodySmall)
         }
 
-        OutlinedTextField(
-            value = productName,
-            onValueChange = { productName = it },
-            label = { Text("Nome do produto") },
-            singleLine = true,
-            modifier = Modifier.fillMaxWidth()
-        )
+        // Nome do produto com autocomplete
+        ExposedDropdownMenuBox(
+            expanded = productMenu && ui.productSuggestions.isNotEmpty(),
+            onExpandedChange = { productMenu = it }
+        ) {
+            OutlinedTextField(
+                value = productName,
+                onValueChange = {
+                    productName = it
+                    viewModel.onProductQueryChange(it)
+                    productMenu = true
+                },
+                label = { Text("Nome do produto") },
+                singleLine = true,
+                modifier = Modifier.fillMaxWidth().menuAnchor(MenuAnchorType.PrimaryEditable)
+            )
+            ExposedDropdownMenu(
+                expanded = productMenu && ui.productSuggestions.isNotEmpty(),
+                onDismissRequest = { productMenu = false }
+            ) {
+                ui.productSuggestions.forEach { suggestion ->
+                    DropdownMenuItem(
+                        text = { Text(suggestion) },
+                        onClick = {
+                            productName = suggestion
+                            viewModel.onProductQueryChange("")
+                            productMenu = false
+                        }
+                    )
+                }
+            }
+        }
 
+        // Categoria com autocomplete + criar inline
         ExposedDropdownMenuBox(
             expanded = categoryMenu,
             onExpandedChange = { categoryMenu = it }
         ) {
             OutlinedTextField(
-                value = ui.categories.firstOrNull { it.id == categoryId }?.name ?: "",
-                onValueChange = {},
-                readOnly = true,
+                value = categoryQuery,
+                onValueChange = {
+                    categoryQuery = it
+                    categoryMenu = true
+                },
                 label = { Text("Categoria") },
                 trailingIcon = { ExposedDropdownMenuDefaults.TrailingIcon(categoryMenu) },
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .menuAnchor(MenuAnchorType.PrimaryNotEditable)
+                singleLine = true,
+                modifier = Modifier.fillMaxWidth().menuAnchor(MenuAnchorType.PrimaryEditable)
             )
             ExposedDropdownMenu(
                 expanded = categoryMenu,
                 onDismissRequest = { categoryMenu = false }
             ) {
-                ui.categories.forEach { category ->
-                    DropdownMenuItem(
-                        text = { Text(category.name) },
-                        onClick = {
-                            categoryId = category.id
-                            categoryMenu = false
-                        }
-                    )
-                }
                 DropdownMenuItem(
                     text = { Text("+ Nova categoria") },
                     onClick = {
@@ -131,6 +166,19 @@ fun AddEditItemScreen(
                         newCategoryDialog = true
                     }
                 )
+                val filtered = ui.categories.filter {
+                    it.name.contains(categoryQuery, ignoreCase = true)
+                }
+                filtered.forEach { category ->
+                    DropdownMenuItem(
+                        text = { Text(category.name) },
+                        onClick = {
+                            categoryId = category.id
+                            categoryQuery = category.name
+                            categoryMenu = false
+                        }
+                    )
+                }
             }
         }
 
@@ -161,40 +209,55 @@ fun AddEditItemScreen(
             modifier = Modifier.fillMaxWidth()
         )
 
+        // Estabelecimento com autocomplete + criar inline
         ExposedDropdownMenuBox(
             expanded = establishmentMenu,
             onExpandedChange = { establishmentMenu = it }
         ) {
             OutlinedTextField(
-                value = ui.establishments.firstOrNull { it.id == establishmentId }?.name ?: "",
-                onValueChange = {},
-                readOnly = true,
+                value = establishmentQuery,
+                onValueChange = {
+                    establishmentQuery = it
+                    establishmentId = null
+                    establishmentMenu = true
+                },
                 label = { Text("Estabelecimento (opcional)") },
                 trailingIcon = { ExposedDropdownMenuDefaults.TrailingIcon(establishmentMenu) },
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .menuAnchor(MenuAnchorType.PrimaryNotEditable)
+                singleLine = true,
+                modifier = Modifier.fillMaxWidth().menuAnchor(MenuAnchorType.PrimaryEditable)
             )
             ExposedDropdownMenu(
                 expanded = establishmentMenu,
                 onDismissRequest = { establishmentMenu = false }
             ) {
-                ui.establishments.forEach { est ->
-                    DropdownMenuItem(
-                        text = { Text(est.name) },
-                        onClick = {
-                            establishmentId = est.id
-                            establishmentMenu = false
-                        }
-                    )
-                }
+                DropdownMenuItem(
+                    text = { Text("+ Novo estabelecimento") },
+                    onClick = {
+                        establishmentMenu = false
+                        newEstablishmentDialog = true
+                    }
+                )
                 DropdownMenuItem(
                     text = { Text("Nenhum") },
                     onClick = {
                         establishmentId = null
+                        establishmentQuery = ""
                         establishmentMenu = false
                     }
                 )
+                val filtered = ui.establishments.filter {
+                    it.name.contains(establishmentQuery, ignoreCase = true)
+                }
+                filtered.forEach { est ->
+                    DropdownMenuItem(
+                        text = { Text(est.name) },
+                        onClick = {
+                            establishmentId = est.id
+                            establishmentQuery = est.name
+                            establishmentMenu = false
+                        }
+                    )
+                }
             }
         }
 
@@ -225,7 +288,7 @@ fun AddEditItemScreen(
     }
 
     if (newCategoryDialog) {
-        var newName by remember { mutableStateOf("") }
+        var newName by remember { mutableStateOf(categoryQuery) }
         AlertDialog(
             onDismissRequest = { newCategoryDialog = false },
             title = { Text("Nova categoria") },
@@ -238,13 +301,46 @@ fun AddEditItemScreen(
                 )
             },
             confirmButton = {
-                TextButton(onClick = {
-                    viewModel.addCategory(newName)
-                    newCategoryDialog = false
-                }) { Text("Criar") }
+                TextButton(
+                    enabled = newName.isNotBlank(),
+                    onClick = {
+                        viewModel.addCategory(newName)
+                        categoryQuery = newName
+                        newCategoryDialog = false
+                    }
+                ) { Text("Criar") }
             },
             dismissButton = {
                 TextButton(onClick = { newCategoryDialog = false }) { Text("Cancelar") }
+            }
+        )
+    }
+
+    if (newEstablishmentDialog) {
+        var newName by remember { mutableStateOf(establishmentQuery) }
+        AlertDialog(
+            onDismissRequest = { newEstablishmentDialog = false },
+            title = { Text("Novo estabelecimento") },
+            text = {
+                OutlinedTextField(
+                    value = newName,
+                    onValueChange = { newName = it },
+                    label = { Text("Nome") },
+                    singleLine = true
+                )
+            },
+            confirmButton = {
+                TextButton(
+                    enabled = newName.isNotBlank(),
+                    onClick = {
+                        viewModel.addEstablishment(newName)
+                        establishmentQuery = newName
+                        newEstablishmentDialog = false
+                    }
+                ) { Text("Criar") }
+            },
+            dismissButton = {
+                TextButton(onClick = { newEstablishmentDialog = false }) { Text("Cancelar") }
             }
         )
     }
