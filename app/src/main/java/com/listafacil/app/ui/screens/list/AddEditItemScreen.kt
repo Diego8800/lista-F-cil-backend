@@ -1,4 +1,5 @@
-package com.listafacil.app.ui.screens.list
+
+                package com.listafacil.app.ui.screens.list
 
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
@@ -60,6 +61,9 @@ fun AddEditItemScreen(
     LaunchedEffect(ui.saved) {
         if (ui.saved) onBack()
     }
+    LaunchedEffect(Unit) {
+        viewModel.reloadEstablishments()
+    }
     LaunchedEffect(editingItem) {
         editingItem?.let {
             if (productName.isEmpty()) {
@@ -93,7 +97,6 @@ fun AddEditItemScreen(
             modifier = Modifier.fillMaxWidth()
         )
 
-        // Categoria
         ExposedDropdownMenuBox(
             expanded = categoryMenu,
             onExpandedChange = { categoryMenu = it }
@@ -140,7 +143,6 @@ fun AddEditItemScreen(
             onUnitSelect = { unit = it }
         )
 
-        // Preço anterior (somente leitura — preenchido automaticamente)
         OutlinedTextField(
             value = editingItem?.previousPriceCents?.let { Money.format(it) } ?: "Sem histórico",
             onValueChange = {},
@@ -159,7 +161,6 @@ fun AddEditItemScreen(
             modifier = Modifier.fillMaxWidth()
         )
 
-        // Estabelecimento
         ExposedDropdownMenuBox(
             expanded = establishmentMenu,
             onExpandedChange = { establishmentMenu = it }
