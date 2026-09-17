@@ -3,15 +3,19 @@ package com.listafacil.app.ui.screens.list
 import androidx.lifecycle.SavedStateHandle
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
-import com.listafacil.app.core.SUPPORTED_UNITS
 import com.listafacil.app.data.repository.ShoppingRepository
 import com.listafacil.app.domain.model.Category
 import com.listafacil.app.domain.model.Establishment
 import com.listafacil.app.domain.model.ShoppingItem
 import dagger.hilt.android.lifecycle.HiltViewModel
 import javax.inject.Inject
+import kotlinx.coroutines.FlowPreview
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.debounce
+import kotlinx.coroutines.flow.distinctUntilChanged
+import kotlinx.coroutines.flow.filter
+import kotlinx.coroutines.launch
 import retrofit2.HttpException
 
 data class AddEditItemUiState(
@@ -22,9 +26,11 @@ data class AddEditItemUiState(
     val isEditing: Boolean = false,
     val item: ShoppingItem? = null,
     val categories: List<Category> = emptyList(),
-    val establishments: List<Establishment> = emptyList()
+    val establishments: List<Establishment> = emptyList(),
+    val productSuggestions: List<String> = emptyList()
 )
 
+@OptIn(FlowPreview::class)
 @HiltViewModel
 class AddEditItemViewModel @Inject constructor(
     savedStateHandle: SavedStateHandle,
@@ -36,6 +42,8 @@ class AddEditItemViewModel @Inject constructor(
 
     private val _ui = MutableStateFlow(AddEditItemUiState(isEditing = itemId != null))
     val ui: StateFlow<AddEditItemUiState> = _ui
+
+    private val _productQuery = MutableStateFlow("")
 
     init {
         viewModelScope.launch {
@@ -57,6 +65,24 @@ class AddEditItemViewModel @Inject constructor(
                 _ui.value = _ui.value.copy(loading = false, error = messageFor(e))
             }
         }
+
+        viewModelScope.launch {
+            _productQuery
+                .debounce(300)
+                .distinctUntilChanged()
+                .filter { it.length >= 2 }
+                .collect { q ->
+                    try {
+                        val suggestions = repository.searchProducts(q)
+                        _ui.value = _ui.value.copy(productSuggestions = suggestions)
+                    } catch (e: Exception) { /* silencioso */ }
+                }
+        }
+    }
+
+    fun onProductQueryChange(q: String) {
+        _productQuery.value = q
+        if (q.length < 2) _ui.value = _ui.value.copy(productSuggestions = emptyList())
     }
 
     fun reloadEstablishments() {
@@ -75,6 +101,20 @@ class AddEditItemViewModel @Inject constructor(
                 val category = repository.createCategory(name)
                 _ui.value = _ui.value.copy(
                     categories = (_ui.value.categories + category).sortedBy { it.name }
+                )
+            } catch (e: Exception) {
+                _ui.value = _ui.value.copy(error = messageFor(e))
+            }
+        }
+    }
+
+    fun addEstablishment(name: String) {
+        if (name.isBlank()) return
+        viewModelScope.launch {
+            try {
+                val establishment = repository.createEstablishment(name)
+                _ui.value = _ui.value.copy(
+                    establishments = (_ui.value.establishments + establishment).sortedBy { it.name }
                 )
             } catch (e: Exception) {
                 _ui.value = _ui.value.copy(error = messageFor(e))
