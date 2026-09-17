@@ -14,8 +14,9 @@ declare module "fastify" {
  * Valida a sessão diretamente na API do Neon Auth.
  */
 export function registerAuth(app: FastifyInstance): void {
-  // Garante que a URL base termine sem barra final
-  const neonAuthUrl = (process.env.NEON_AUTH_BASE_URL || "").replace(/\/$/, "");
+  // Limpa barras e sufixo /auth duplicado no final da URL base
+  const rawBase = (process.env.NEON_AUTH_BASE_URL || "").replace(/\/$/, "");
+  const baseUrl = rawBase.endsWith("/auth") ? rawBase.slice(0, -5) : rawBase;
 
   app.decorate("authenticate", async (req: FastifyRequest, reply: FastifyReply) => {
     const header = req.headers.authorization;
@@ -26,10 +27,8 @@ export function registerAuth(app: FastifyInstance): void {
     const token = header.slice("Bearer ".length).trim();
 
     try {
-      // O endpoint correto do Neon/Better Auth é /auth/get-session ou /get-session
-      const targetUrl = neonAuthUrl.endsWith("/auth")
-        ? `${neonAuthUrl}/get-session`
-        : `${neonAuthUrl}/auth/get-session`;
+      // Monta a URL correta garantindo apenas um /auth/get-session
+      const targetUrl = `${baseUrl}/auth/get-session`;
 
       const response = await fetch(targetUrl, {
         method: "GET",
@@ -40,14 +39,12 @@ export function registerAuth(app: FastifyInstance): void {
       });
 
       if (!response.ok) {
+        console.error(`[Auth Failed] Status: ${response.status} URL: ${targetUrl}`);
         return reply.code(401).send({ error: "Sessão inválida ou expirada" });
       }
 
       const data = await response.json();
-      
-      console.log("[Neon Auth Validated Payload]:", JSON.stringify(data));
 
-      // Extrai o ID do usuário da resposta do Neon Auth
       const userId =
         data?.user?.id ||
         data?.session?.userId ||
