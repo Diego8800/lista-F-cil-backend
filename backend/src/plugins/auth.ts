@@ -29,7 +29,7 @@ export function registerAuth(app: FastifyInstance): void {
         method: "GET",
         headers: {
           "Origin": origin,
-          "Cookie": `better-auth.session_token=${token}; __Secure-better-auth.session_token=${token}; neon-auth.session_token=${token}; __Secure-neon-auth.session_token=${token}`
+          "Cookie": `__Secure-neon-auth.session_token=${token}`
         }
       });
 
