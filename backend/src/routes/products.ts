@@ -2,8 +2,21 @@ import type { FastifyInstance } from "fastify";
 import { db } from "../db/client.js";
 
 export async function productRoutes(app: FastifyInstance): Promise<void> {
+  // GET /products?q=texto — autocomplete de produtos já usados
+  app.get("/products", async (req) => {
+    const { userId, token } = req.auth;
+    const { q = "" } = req.query as { q?: string };
+    const sql = db(token);
+    const rows = await sql(
+      `SELECT DISTINCT p.id, p.name FROM products p
+       WHERE p.user_id = $1 AND p.name ILIKE $2
+       ORDER BY p.name LIMIT 10`,
+      [userId, `%${q}%`]
+    );
+    return { products: rows };
+  });
+
   // GET /products/:id/history
-  // Estatísticas: preço atual (último), anterior (penúltimo), menor, maior e médio.
   app.get("/products/:id/history", async (req, reply) => {
     const { id } = req.params as { id: string };
     const { userId, token } = req.auth;
