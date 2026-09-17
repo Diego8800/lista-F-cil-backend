@@ -25,7 +25,6 @@ export function registerAuth(app: FastifyInstance): void {
     const token = header.slice("Bearer ".length).trim();
 
     try {
-      // Valida o token de sessão diretamente no Neon Auth
       const response = await fetch(`${neonAuthUrl}/get-session`, {
         headers: {
           "Authorization": `Bearer ${token}`,
@@ -38,14 +37,25 @@ export function registerAuth(app: FastifyInstance): void {
       }
 
       const data = await response.json();
-      const userId = data?.user?.id || data?.session?.userId;
+      
+      // Log do payload para depuração no Railway
+      console.log("[Neon Auth Response]:", JSON.stringify(data));
+
+      // Mapeia todas as possíveis estruturas de ID retornadas pelo Neon Auth / Better Auth
+      const userId = 
+        data?.user?.id || 
+        data?.session?.userId || 
+        data?.session?.user?.id ||
+        data?.userId ||
+        data?.id;
 
       if (!userId) {
         return reply.code(401).send({ error: "Usuário não encontrado na sessão" });
       }
 
       req.auth = { userId, token };
-    } catch {
+    } catch (err) {
+      console.error("[Auth Error]:", err);
       return reply.code(401).send({ error: "Sessão inválida ou expirada" });
     }
   });
