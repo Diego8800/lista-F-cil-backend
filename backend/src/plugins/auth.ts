@@ -2,6 +2,7 @@ import type { FastifyInstance, FastifyReply, FastifyRequest } from "fastify";
 
 declare module "fastify" {
   interface FastifyRequest {
+    /** Dados da sessão validada (preHandler `authenticate`). */
     auth: { userId: string; token: string };
   }
   interface FastifyInstance {
@@ -9,8 +10,12 @@ declare module "fastify" {
   }
 }
 
+/**
+ * Valida a sessão diretamente na API do Neon Auth.
+ */
 export function registerAuth(app: FastifyInstance): void {
-  const neonAuthUrl = (process.env.NEON_AUTH_BASE_URL || "").replace(/\/$/, "");
+  const rawBase = (process.env.NEON_AUTH_BASE_URL || "").replace(/\/$/, "");
+  const baseUrl = rawBase.endsWith("/auth") ? rawBase.slice(0, -5) : rawBase;
 
   app.decorate("authenticate", async (req: FastifyRequest, reply: FastifyReply) => {
     const header = req.headers.authorization;
@@ -20,18 +25,8 @@ export function registerAuth(app: FastifyInstance): void {
 
     const token = header.slice("Bearer ".length).trim();
 
-    // 1. Log das variáveis de ambiente e token recebido do app Android
-    console.log("=== [DEBUG AUTH START] ===");
-    console.log("NEON_AUTH_BASE_URL configurado:", neonAuthUrl);
-    console.log("Token recebido do Android:", token);
-
     try {
-      // Testamos a rota de sessão padrão do Better Auth / Neon Auth
-      const targetUrl = neonAuthUrl.endsWith("/auth")
-        ? `${neonAuthUrl}/get-session`
-        : `${neonAuthUrl}/auth/get-session`;
-
-      console.log("URL chamada no Neon Auth:", targetUrl);
+      const targetUrl = `${baseUrl}/auth/get-session`;
 
       const response = await fetch(targetUrl, {
         method: "GET",
@@ -40,24 +35,19 @@ export function registerAuth(app: FastifyInstance): void {
         }
       });
 
-      console.log("Status HTTP do Neon Auth:", response.status);
-
-      const rawText = await response.text();
-      console.log("Resposta BRUTA (raw text) do Neon Auth:", rawText);
-
       if (!response.ok) {
-        console.log("=== [DEBUG AUTH END - FAIL STATUS] ===");
         return reply.code(401).send({ error: "Sessão inválida ou expirada" });
       }
 
-      let data: any = {};
-      try {
-        data = JSON.parse(rawText);
-      } catch (e) {
-        console.error("Falha ao parsear JSON do Neon Auth");
+      const rawText = await response.text();
+      
+      // Se a resposta for "null" ou vazia, a sessão expirou no Neon Auth
+      if (!rawText || rawText.trim() === "null") {
+        return reply.code(401).send({ error: "Sessão expirada. Faça login novamente." });
       }
 
-      // Procura por qualquer campo que se pareça com o ID do usuário
+      const data = JSON.parse(rawText);
+
       const userId =
         data?.user?.id ||
         data?.session?.userId ||
@@ -65,18 +55,14 @@ export function registerAuth(app: FastifyInstance): void {
         data?.userId ||
         data?.id;
 
-      console.log("UserId extraído:", userId);
-      console.log("=== [DEBUG AUTH END] ===");
-
       if (!userId) {
-        return reply.code(401).send({ error: "Usuário não encontrado na sessão" });
+        return reply.code(401).send({ error: "Sessão expirada. Faça login novamente." });
       }
 
       req.auth = { userId, token };
     } catch (err) {
-      console.error("[DEBUG AUTH ERROR]:", err);
-      console.log("=== [DEBUG AUTH END - EXCEPTION] ===");
-      return reply.code(401).send({ error: "Sessão inválida ou expirada" });
+      console.error("[Auth Exception]:", err);
+      return reply.code(401).send({ error: "Falha ao validar autenticação" });
     }
   });
 }
