@@ -1,5 +1,4 @@
 import type { FastifyInstance, FastifyReply, FastifyRequest } from "fastify";
-import { neonAuthBaseUrl } from "../env.js";
 
 declare module "fastify" {
   interface FastifyRequest {
@@ -13,9 +12,10 @@ declare module "fastify" {
 
 /**
  * Valida a sessão diretamente na API do Neon Auth.
- * Suporta o token de sessão enviado pelo app Android.
  */
 export function registerAuth(app: FastifyInstance): void {
+  const neonAuthUrl = process.env.NEON_AUTH_BASE_URL || "";
+
   app.decorate("authenticate", async (req: FastifyRequest, reply: FastifyReply) => {
     const header = req.headers.authorization;
     if (!header || !header.startsWith("Bearer ")) {
@@ -26,7 +26,7 @@ export function registerAuth(app: FastifyInstance): void {
 
     try {
       // Valida o token de sessão diretamente no Neon Auth
-      const response = await fetch(`${neonAuthBaseUrl}/get-session`, {
+      const response = await fetch(`${neonAuthUrl}/get-session`, {
         headers: {
           "Authorization": `Bearer ${token}`,
           "Origin": "http://localhost:3000"
