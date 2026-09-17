@@ -121,6 +121,9 @@ class ShoppingRepository @Inject constructor(
     suspend fun getEstablishments(): List<Establishment> =
         api.getEstablishments().establishments.map { Establishment(it.id, it.name) }
 
+        suspend fun searchProducts(q: String): List<String> =
+    api.searchProducts(q).products.map { it.name }
+
     suspend fun createEstablishment(name: String): Establishment {
         val dto = api.createEstablishment(NameRequest(name))
         return Establishment(dto.id, dto.name)
