@@ -16,7 +16,6 @@ import okhttp3.OkHttpClient
 import okhttp3.logging.HttpLoggingInterceptor
 import retrofit2.Retrofit
 
-/** Token da sessão em memória, sincronizado com o DataStore criptografado. */
 @Singleton
 class TokenProvider @javax.inject.Inject constructor() {
     @Volatile
@@ -69,7 +68,7 @@ object AppModule {
     @Named("auth")
     fun provideAuthRetrofit(client: OkHttpClient, json: Json): Retrofit =
         Retrofit.Builder()
-            .baseUrl(BuildConfig.NEON_AUTH_BASE_URL)
+            .baseUrl(BuildConfig.BACKEND_BASE_URL)
             .client(client)
             .addConverterFactory(json.asConverterFactory("application/json".toMediaType()))
             .build()
