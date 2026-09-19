@@ -41,7 +41,7 @@ class ActiveListViewModel @Inject constructor(
         get() {
             val s = _ui.value
             val spent = s.items.filter { it.purchased }
-                .sumOf { it.currentPriceCents ?: 0L }
+    .sumOf { (it.currentPriceCents ?: 0L) * it.quantity.toLong() }
             return (s.list?.budgetCents ?: 0L) - spent
         }
 
