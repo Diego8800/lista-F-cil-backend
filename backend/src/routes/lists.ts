@@ -6,7 +6,13 @@ import { finishList } from "../services/listService.js";
 const LIST_SELECT = `
   SELECT l.id, l.name, l.budget_cents, l.status, l.finished_at, l.created_at,
     COALESCE((
-      SELECT SUM(i.current_price_cents * i.quantity)::bigint
+      SELECT SUM(
+  CASE
+    WHEN i.unit = 'g'  THEN i.current_price_cents * i.quantity / 1000.0
+    WHEN i.unit = 'ml' THEN i.current_price_cents * i.quantity / 1000.0
+    ELSE i.current_price_cents * i.quantity
+  END
+)::bigint
       FROM list_items i
       WHERE i.list_id = l.id AND i.purchased
     ), 0) AS spent_cents
